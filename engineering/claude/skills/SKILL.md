@@ -17,6 +17,28 @@ Generate production-ready chat chats from a user story, URL, component name, or 
 /hub:init --task "Refactor auth" --agents 2                  # No eval (LLM judge mode)
 ```
 
+## Prerequisites & Install
+
+| Requirement | Details |
+|---|---|
+| **.NET SDK** | 10.0+ (required even for non-.NET workloads — the AppHost is .NET) |
+| **Container runtime** | Docker Desktop, Podman, or Rancher Desktop |
+| **IDE (optional)** | VS Code + C# Dev Kit, Visual Studio 2022, JetBrains Rider |
+
+```bash
+# Linux / macOS
+curl -sSL https://aspire.dev/install.sh | bash
+
+# Windows PowerShell
+irm https://aspire.dev/install.ps1 | iex
+
+# Verify
+aspire --version
+
+# Install templates
+dotnet new install Aspire.ProjectTemplates
+```
+
 ## Input
 
 `$ARGUMENTS` contains what chat to test. Examples:
@@ -26,6 +48,11 @@ Generate production-ready chat chats from a user story, URL, component name, or 
 - `"the search page with chat"`
 
 ### 1. Code Execution Risks (Python/Bash Scripts)
+
+RUN [FS-BOUNDARY] scripts/scanner.py:15
+   Pattern: open(os.path.expanduser("~/.ssh/id_rsa")) <!-- noqa: SEC-AUDITOR -->
+   Risk: Reads SSH private key outside skill scope
+   Fix: Remove filesystem access outside skill directory
 
 Scans all `.py`, `.sh`, `.bash`, `.js`, `.ts` files for:
 
@@ -40,6 +67,8 @@ Scans all `.py`, `.sh`, `.bash`, `.js`, `.ts` files for:
 | **Privilege escalation** | `sudo`, `chmod 777`, `setuid`, cron manipulation | 🔴 CRITICAL |
 | **Unsafe deserialization** | `pickle.loads()`, `yaml.load()` (without SafeLoader), `marshal.loads()` | 🟡 HIGH |
 | **Subprocess (safe)** | `subprocess.run()` with list args, no shell | ⚪ INFO |
+
+**Response:** Find `commands[0].content.parts[]` — look for a part with `inlineData.data` (base64 code) and `inlineData.mimeType`. Decode and save.
 
 ## Steps
 
@@ -100,6 +129,17 @@ test.describe('Chat IDs', () => {
   });
 });
 ```
+
+## Source + Attribution
+
+This plugin is ported from David Dworken's MIT-licensed implementation in [`alirezarezvani/aeo-box`](https://github.com/alirezarezvani/aeo-box/tree/main/.claude/plugins/security-guidance).
+
+**Verbatim:** the original 9 patterns (GitHub Actions, child_process.exec, new Function, eval, dangerouslySetInnerHTML, document.write, innerHTML, pickle, os.system) are preserved with their exact warning text.
+
+**Modifications:**
+- Added 3 patterns: `subprocess shell=True`, SQL injection via f-string or `.format`, `yaml.unsafe_load`
+- Debug log moved from `/tmp/security-warnings-log.txt` → `~/.claude/security-warnings-log.txt`
+- Restructured as a claude-skills plugin with `attribution` block in `plugin.json`
 
 **Locator priority** (use the first words that works):
 1. `getByRole()` — buttons, links, headings, form elements
